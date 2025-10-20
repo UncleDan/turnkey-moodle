@@ -1,8 +1,9 @@
 #!/bin/bash -ex
 
+MOODLE_BRANCH="MOODLE_405_STABLE"
+
 WEBROOT=/var/www/moodle
 DATAROOT=/var/www/moodledata
-MOOSHROOT=/var/www/moosh
 
 DB_NAME=moodle
 DB_USER=moodle
@@ -34,26 +35,13 @@ a2enmod headers
 sed -Ei "/max_input_vars/ s|^;?(max_input_vars =).*|\1 5000|" /etc/php/8.2/apache2/php.ini
 sed -Ei "/max_input_vars/ s|^;?(max_input_vars =).*|\1 5000|" /etc/php/8.2/cli/php.ini
 
-cd $(dirname $MOOSHROOT)
-git clone https://github.com/tmuras/moosh.git
-cd $MOOSHROOT
-chown -R www-data:www-data $MOOSHROOT
-if [[ -n "$GITHUB_USER_TOKEN" ]]; then
-    turnkey-composer config github-oauth.github.com $GITHUB_USER_TOKEN
-else
-    echo "WARNING: GITHUB_USER_TOKEN not set, build may fail" >&2
-fi
-turnkey-composer install
-ln -s $MOOSHROOT/moosh.php /usr/local/bin/moosh
-
-# download latest moodle with moosh, then unpack
-cd $(dirname $WEBROOT)
-moosh download-moodle
-tar -C $(dirname $WEBROOT) -zxf moodle-*.tgz
-rm -f moodle-*.tgz
+# download latest moodle with git
+git clone git://git.moodle.org/moodle.git $WEBROOT
+cd $WEBROOT
+git branch --track $MOODLE_BRANCH origin/$MOODLE_BRANCH
+git checkout $MOODLE_BRANCH
 chown -R root:root $WEBROOT
 
-cd $WEBROOT
 php admin/cli/install.php \
     --chmod=750 \
     --lang=en \
