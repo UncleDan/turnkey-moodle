@@ -75,6 +75,7 @@ php admin/cli/install.php \
     --agree-license
 
 chown -R www-data:www-data $DATAROOT
+chown -R www-data:www-data /var/www/moodle/theme
 chown root:www-data $WEBROOT/config.php
 
 ## tweak config
