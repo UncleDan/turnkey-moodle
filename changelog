@@ -5,6 +5,7 @@ turnkey-moodle5-18.1 (1) turnkey; urgency=low
 
   * Set correct permissions and creating (eventually) missing folders.
 
+  * Change pointing to /public.
 
 turnkey-moodle-18.0 (1) turnkey; urgency=low
 
