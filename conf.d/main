@@ -56,7 +56,7 @@ git checkout $MOODLE_BRANCH
 mkdir $DATAROOT
 
 # using UncleDan script to fix permissions
-/usr/bin/moodle-perms-bookworm.sh --fix --moodlepath "$WEBROOT" --moodledata "$DATAROOT" --moodleversion "$MOODLE_VERSION"
+/usr/bin/moodle-perms-bookworm.sh --fix
 
 php admin/cli/install.php \
     --chmod=750 \
@@ -79,7 +79,7 @@ php admin/cli/install.php \
     --agree-license
 
 # reset permissions using UncleDan script just in case...
-/usr/bin/moodle-perms-bookworm.sh --fix --moodlepath "$WEBROOT" --moodledata "$DATAROOT" --moodleversion "$MOODLE_VERSION"
+/usr/bin/moodle-perms-bookworm.sh --fix
 
 ## tweak config
 
