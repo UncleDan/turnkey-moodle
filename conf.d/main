@@ -52,6 +52,9 @@ cd $WEBROOT
 git branch --track $MOODLE_BRANCH origin/$MOODLE_BRANCH
 git checkout $MOODLE_BRANCH
 
+# create the data folder to ser permissions
+mkdir $DATAROOT
+
 # using UncleDan script to fix permissions
 /usr/bin/moodle-perms-bookworm.sh --fix --moodlepath "$WEBROOT" --moodledata "$DATAROOT" --moodleversion "$MOODLE_VERSION"
 
