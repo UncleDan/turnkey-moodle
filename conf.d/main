@@ -58,14 +58,7 @@ git checkout $MOODLE_BRANCH
 # create the data folder to ser permissions
 mkdir $DATAROOT
 
-# get the latest version of UncleDan's set-moodle-perms script and link it to /usr/local/bin for easy execution (THX https://www.turnkeylinux.org/comment/58945#comment-58945 )
-cd /usr/local/src
-git clone https://github.com/UncleDan/moodle-scripts.git
-ln -s /usr/local/src/moodle-scripts/set-moodle-perms  /usr/local/bin/set-moodle-perms
-
-# using UncleDan script to fix permissions
-set-moodle-perms --moodleversion 4 --fix
-
+# CLI installation of moodle - see https://docs.moodle.org/501/en/Installing_Moodle_using_cli for more info
 php admin/cli/install.php \
     --chmod=750 \
     --lang=en \
@@ -86,7 +79,12 @@ php admin/cli/install.php \
     --non-interactive \
     --agree-license
 
-# reset permissions using UncleDan script just in case...
+# get the latest version of UncleDan's set-moodle-perms script and link it to /usr/local/bin for easy execution (THX https://www.turnkeylinux.org/comment/58945#comment-58945 )
+cd /usr/local/src
+git clone https://github.com/UncleDan/moodle-scripts.git
+ln -s /usr/local/src/moodle-scripts/set-moodle-perms  /usr/local/bin/set-moodle-perms
+
+# set permissions using UncleDan script just in case...
 set-moodle-perms --moodleversion 4 --fix
 
 ## tweak config
