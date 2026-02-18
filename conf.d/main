@@ -92,6 +92,17 @@ sed -i "s|\$CFG->wwwroot \(.*\)|\$protocol='http://';\n\$hostname='127.0.0.1';\n
 # prevent setting of executable paths via Admin UI (locks down possible privilege escalation)
 sed -i "/'admin';$/ a \$CFG->preventexecpath = true;" $WEBROOT/config.php
 
+# change document root to /var/www/moodle/public if running Moodle 5.0 (makes this modular)
+if [ "$MOODLE_VERSION" = "5" ]; then
+    echo "Moodle 5 detected. Updating DocumentRoot..."
+    sudo sed -i 's|/var/www/moodle/|/var/www/moodle/public/|g' "$CONF_FILE"
+    
+    echo "Update complete. Checking syntax..."
+    apachectl configtest
+else
+    echo "Moodle version is $MOODLE_VERSION. No path changes required."
+fi
+
 # set paths to utils
 mysql --defaults-extra-file=/etc/mysql/debian.cnf <<EOF
 USE $DB_NAME;
