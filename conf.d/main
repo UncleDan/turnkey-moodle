@@ -2,6 +2,9 @@
 
 # REFERENCE: https://docs.moodle.org/501/en/Git_for_Administrators
 
+# As of today 18/02/2026, use "MOODLE_405_STABLE" branch as the latest stable release of Moodle is 4.5.2
+# or "MOODLE_501_STABLE" as the latest stable release of Moodle is 5.0.4.
+
 MOODLE_BRANCH="MOODLE_405_STABLE"
 
 # Determine Moodle version from branch
