@@ -100,7 +100,7 @@ sed -i "/'admin';$/ a \$CFG->preventexecpath = true;" $WEBROOT/config.php
 # change document root to /var/www/moodle/public if running Moodle 5.0 (makes this modular)
 if [ "$MOODLE_VERSION" = "5" ]; then
     echo "Moodle 5 detected. Updating DocumentRoot..."
-    sudo sed -i 's|/var/www/moodle/|/var/www/moodle/public/|g' "$CONF_FILE"
+    sudo sed -i 's|/var/www/moodle/|/var/www/moodle/public/|g' "/etc/apache2/sites-available/moodle.conf"
     
     echo "Update complete. Checking syntax..."
     apachectl configtest
