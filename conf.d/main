@@ -85,7 +85,7 @@ git clone https://github.com/UncleDan/moodle-scripts.git
 ln -s /usr/local/src/moodle-scripts/set-moodle-perms  /usr/local/bin/set-moodle-perms
 
 # set permissions using UncleDan script just in case...
-set-moodle-perms --moodleversion 4 --fix
+set-moodle-perms --moodleversion $MOODLE_VERSION --fix
 
 ## tweak config
 
