@@ -7,6 +7,12 @@ turnkey-moodle-19.0 (1) turnkey; urgency=low
     Special thanks to https://github.com/marcos-mendez &
     https://github.com/UncleDan.
 
+  * Include UncleDan's Moodle permission script:
+    - see https://github.com/UncleDan/moodle-scripts/set-moodle-perms
+    (merged directly into buildcode; renamed as 'tkl-set-moodle-perms' - so
+    easy to find via tab-complete).
+    Special thanks to https://github.com/UncleDan
+
   * Harden default Moodle file/dir permissions as per upstream recommendation
     for "Production" site.
 
