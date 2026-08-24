@@ -2,7 +2,6 @@
 
 WEBROOT=/var/www/moodle
 DATAROOT=/var/www/moodledata
-MOOSHROOT=/var/www/moosh
 
 DB_NAME=moodle
 DB_USER=moodle
@@ -10,7 +9,6 @@ DB_PASS=$(mcookie)
 
 ADMIN_USER="admin"
 ADMIN_PASS=turnkey
-
 
 # start mysql
 systemctl start mysql
@@ -29,24 +27,14 @@ a2ensite moodle
 a2enmod rewrite
 a2enmod headers
 
-cd "$(dirname $MOOSHROOT)"
-git clone https://github.com/tmuras/moosh.git
-cd $MOOSHROOT
-chown -R www-data:www-data $MOOSHROOT
-if [[ -n "$GITHUB_USER_TOKEN" ]]; then
-    turnkey-composer config github-oauth.github.com "$GITHUB_USER_TOKEN"
-else
-    echo "WARNING: GITHUB_USER_TOKEN not set, build may fail" >&2
-fi
-turnkey-composer install
-ln -s $MOOSHROOT/moosh.php /usr/local/bin/moosh
-
-# download latest moodle with moosh, then unpack
-cd "$(dirname $WEBROOT)"
-moosh download-moodle
-tar -C "$(dirname $WEBROOT) -zxf moodle-*.tgz"
-rm -f moodle-*.tgz
-chown -R root:root $WEBROOT
+MOODLE_BRANCH=$(
+    git ls-remote --heads https://github.com/moodle/moodle.git 'MOODLE_*_STABLE' \
+    | awk '{print $2}' \
+    | sed 's|refs/heads/||' \
+    | sort -t_ -k2 -n -k3 -n \
+    | tail -1)
+git clone --depth 1 --branch "$MOODLE_BRANCH" \
+    https://github.com/moodle/moodle.git "$WEBROOT"
 
 cd $WEBROOT
 php admin/cli/install.php \
@@ -69,9 +57,12 @@ php admin/cli/install.php \
     --non-interactive \
     --agree-license
 
-chown -R www-data:www-data $DATAROOT
-chown -R www-data:www-data /var/www/moodle/theme
+chown -R www-data:www-data $WEBROOT/theme
 chown root:www-data $WEBROOT/config.php
+chown -R www-data:www-data $DATAROOT
+# file/dir permissions should be ok, but just in case...
+find $WEBROOT -type d -exec chmod 0755 {} \;
+find $WEBROOT -type f -exec chmod 0644 {} \;
 
 ## tweak config
 
