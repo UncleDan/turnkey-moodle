@@ -1,5 +1,6 @@
 COMMON_CONF = apache-credit
 
+PHP_MAX_INPUT_VARS = 5000
 CREDIT_LOCATION = ~ "^/(?!(lib/editor))"
 
 include $(FAB_PATH)/common/mk/turnkey/lamp.mk
