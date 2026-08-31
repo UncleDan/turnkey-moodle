@@ -13,12 +13,23 @@ and on top of that:
 
 - Moodle configurations:
    
-   - Installed from upstream source code at /var/www/moodle.
+   - Installed from a pinned upstream commit at /var/www/moodle.
    - SSL logins are forced (security).
    - Includes support for authentication via ldap (convenience).
    - Configured default email address for admin, guest and noreply email
      (@example.com).
    - Set default theme to formal\_white (more attractive).
+   - Hardened "Production" file/dir permissions as recommended by upstream
+     (security).
+
+     **Security note**: Updates to Moodle may require supervision so they **ARE
+     NOT** configured to install automatically. See `Moodle Upgrade docs`_ for
+     details on the process.
+
+     Moodle core, themes, plugins and configuration are root-owned; only
+     ``/var/www/moodledata`` is writable by the web service. Use
+     ``tkl-set-moodle-perms --fix`` after a supervised upgrade to restore this
+     boundary.
 
 - SSL support out of the box.
 - `Adminer`_ administration frontend for MySQL (listening on port
@@ -30,6 +41,7 @@ and on top of that:
 Moodle documentation:
 
 - `Teacher documentation`_
+- `Admin via CLI`_
 - `Administrator documentation`_
 - `Developer documentation`_
 
@@ -37,13 +49,15 @@ Credentials *(passwords set at first boot)*
 -------------------------------------------
 
 -  Adminer: username: **adminer**
--  Webmin, Webshell, SSH, MySQL: username **root**
+-  Webmin, SSH, MySQL: username **root**
 -  Moodle: username **admin**
 
 
-.. _Moodle: http://moodle.org
+.. _Moodle: https://moodle.org
 .. _TurnKey Core: https://www.turnkeylinux.org/core
-.. _Adminer: http://www.adminer.org/
-.. _Teacher documentation: http://docs.moodle.org/en/Teacher_documentation
-.. _Administrator documentation: http://docs.moodle.org/en/Administrator_documentation
-.. _Developer documentation: http://docs.moodle.org/en/Developer_documentation
+.. _Moodle Upgrade docs: https://docs.moodle.org/en/Upgrading
+.. _Adminer: https://www.adminer.org/
+.. _Teacher documentation: https://docs.moodle.org/en/Teacher_documentation
+.. _Admin via CLI: https://docs.moodle.org/en/Administration_via_command_line
+.. _Administrator documentation: https://docs.moodle.org/en/Administrator_documentation
+.. _Developer documentation: https://docs.moodle.org/en/Developer_documentation

@@ -2,27 +2,25 @@
 
 WEBROOT=/var/www/moodle
 DATAROOT=/var/www/moodledata
-MOOSHROOT=/var/www/moosh
 
 DB_NAME=moodle
 DB_USER=moodle
 DB_PASS=$(mcookie)
 
-ADMIN_USER=admin
+ADMIN_USER="admin"
 ADMIN_PASS=turnkey
-
-# convenience execution variables
-MYSQL_BATCH="mysql --user=root --password=$MYSQL_PASS --batch"
-MYSQL_ADMIN="mysqladmin --user=root --password=$MYSQL_PASS"
+MOODLE_COMMIT=b07dd04b40ece3b2d43b2e6ec1213db2a997df7f
 
 # start mysql
 systemctl start mysql
 
 # create database
-$MYSQL_ADMIN create $DB_NAME
+mysqladmin create $DB_NAME
 
 # create database user with privileges on the database
-$MYSQL_BATCH --execute "grant all privileges on $DB_NAME.* to $DB_USER@localhost identified by '$DB_PASS'; flush privileges;"
+MYSQL_BATCH="mysql --batch --execute"
+$MYSQL_BATCH "grant all privileges on $DB_NAME.* to $DB_USER@localhost identified by '$DB_PASS';"
+$MYSQL_BATCH "flush privileges;"
 
 # setup apache configuration and complete installation
 a2dissite 000-default
@@ -30,28 +28,11 @@ a2ensite moodle
 a2enmod rewrite
 a2enmod headers
 
-# tweak php.ini as recommended by moodle
-sed -Ei "/max_input_vars/ s|^;?(max_input_vars =).*|\1 5000|" /etc/php/8.2/apache2/php.ini
-sed -Ei "/max_input_vars/ s|^;?(max_input_vars =).*|\1 5000|" /etc/php/8.2/cli/php.ini
-
-cd $(dirname $MOOSHROOT)
-git clone https://github.com/tmuras/moosh.git
-cd $MOOSHROOT
-chown -R www-data:www-data $MOOSHROOT
-if [[ -n "$GITHUB_USER_TOKEN" ]]; then
-    turnkey-composer config github-oauth.github.com $GITHUB_USER_TOKEN
-else
-    echo "WARNING: GITHUB_USER_TOKEN not set, build may fail" >&2
-fi
-turnkey-composer install
-ln -s $MOOSHROOT/moosh.php /usr/local/bin/moosh
-
-# download latest moodle with moosh, then unpack
-cd $(dirname $WEBROOT)
-moosh download-moodle
-tar -C $(dirname $WEBROOT) -zxf moodle-*.tgz
-rm -f moodle-*.tgz
-chown -R root:root $WEBROOT
+git init "$WEBROOT"
+git -C "$WEBROOT" remote add origin https://github.com/moodle/moodle.git
+git -C "$WEBROOT" fetch --depth 1 origin "$MOODLE_COMMIT"
+git -C "$WEBROOT" checkout --detach "$MOODLE_COMMIT"
+test "$(git -C "$WEBROOT" rev-parse HEAD)" = "$MOODLE_COMMIT"
 
 cd $WEBROOT
 php admin/cli/install.php \
@@ -63,7 +44,7 @@ php admin/cli/install.php \
     --dbhost=localhost \
     --dbname=$DB_NAME \
     --dbuser=$DB_USER \
-    --dbpass=$DB_PASS \
+    --dbpass="$DB_PASS" \
     --prefix="" \
     --fullname="TurnKey Moodle" \
     --shortname=moodle \
@@ -74,9 +55,16 @@ php admin/cli/install.php \
     --non-interactive \
     --agree-license
 
-chown -R www-data:www-data $DATAROOT
-chown -R www-data:www-data /var/www/moodle/theme
-chown root:www-data $WEBROOT/config.php
+# Executable Moodle and theme/plugin code is root-owned. Only Moodle's data
+# directory remains writable by the web service.
+chown -R root:root "$WEBROOT"
+find "$WEBROOT" -type d -exec chmod 0755 {} +
+find "$WEBROOT" -type f -exec chmod 0644 {} +
+chown root:www-data "$WEBROOT/config.php"
+chmod 0640 "$WEBROOT/config.php"
+chown -R www-data:www-data "$DATAROOT"
+find "$DATAROOT" -type d -exec chmod 0750 {} +
+find "$DATAROOT" -type f -exec chmod 0640 {} +
 
 ## tweak config
 
@@ -87,7 +75,7 @@ sed -i "s|\$CFG->wwwroot \(.*\)|\$protocol='http://';\n\$hostname='127.0.0.1';\n
 sed -i "/'admin';$/ a \$CFG->preventexecpath = true;" $WEBROOT/config.php
 
 # set paths to utils
-mysql --defaults-extra-file=/etc/mysql/debian.cnf <<EOF
+mysql <<EOF
 USE $DB_NAME;
 UPDATE config SET value = '1' WHERE name = 'loginhttps';
 UPDATE config SET value = '127.0.0.1' WHERE name = 'smtphosts';
@@ -100,6 +88,11 @@ UPDATE config SET value = '/usr/bin/gs' WHERE name = 'pathtogs';
 UPDATE config SET value = '/usr/bin/pdftoppm' WHERE name = 'pathtopdftoppm';
 UPDATE config SET value = '/usr/bin/python3' WHERE name = 'pathtopython';
 EOF
+
+# Moodle 5.2 does not seed noreplyaddress, so an UPDATE alone is a no-op.
+# Use Moodle's configuration API to create it and invalidate its cache.
+runuser -u www-data -- php admin/cli/cfg.php \
+    --name=noreplyaddress --set=noreply@example.com
 
 # disable user delete - removes hyped up "critical" warning
 # - see https://tracker.moodle.org/browse/MDL-67852 for more info
