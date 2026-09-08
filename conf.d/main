@@ -57,14 +57,10 @@ php admin/cli/install.php \
 
 # Executable Moodle and theme/plugin code is root-owned. Only Moodle's data
 # directory remains writable by the web service.
-chown -R root:root "$WEBROOT"
-find "$WEBROOT" -type d -exec chmod 0755 {} +
-find "$WEBROOT" -type f -exec chmod 0644 {} +
-chown root:www-data "$WEBROOT/config.php"
-chmod 0640 "$WEBROOT/config.php"
-chown -R www-data:www-data "$DATAROOT"
-find "$DATAROOT" -type d -exec chmod 0750 {} +
-find "$DATAROOT" -type f -exec chmod 0640 {} +
+# In this mode, you cannot install plugins from the Moodle graphical interface:
+# change the line below to “--semi-harden” if you want to be able to install plugins
+# from the graphical interface by setting slightly less restrictive permissions.
+tkl-set-moodle-perms --harden
 
 ## tweak config
 
