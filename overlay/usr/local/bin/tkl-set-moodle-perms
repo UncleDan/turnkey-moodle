@@ -78,7 +78,13 @@ show_header() {
     echo " Web user   : ${WWW_USER}:${WWW_GROUP}"
     echo " Moodle dir : ${MOODLE_DIR} (${MOODLE_DIR_SOURCE})"
     echo " Data dir   : ${MOODLEDATA_DIR} (${MOODLEDATA_DIR_SOURCE})"
-    [ "$DRY_RUN"  = true ] && echo " Mode       : DRY-RUN (no changes applied)"
+    if [ "$DRY_RUN" = true ]; then
+        if [ "$APPLY_HARDEN" = true ]; then
+            echo " Mode       : DRY-RUN of HARDEN (no changes applied)"
+        else
+            echo " Mode       : DRY-RUN of SEMI-HARDEN (no changes applied)"
+        fi
+    fi
     [ "$DRY_RUN"  = false ] && [ "$APPLY_FIXES" = true ] && echo " Mode       : SEMI-HARDEN (real changes, core code read-only)"
     [ "$DRY_RUN"  = false ] && [ "$APPLY_HARDEN" = true ] && echo " Mode       : HARDEN (real changes, read-only code tree)"
     echo "================================================================================"
@@ -93,7 +99,9 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  -h,  --help               Show this message"
-    echo "  -d,  --dry-run            Simulate the operations without applying them"
+    echo "  -d,  --dry-run            Simulate without applying. Combine with"
+    echo "                            --semi-harden or --harden to choose the model;"
+    echo "                            --semi-harden is simulated by default."
     echo "  -f,  --fix                Alias of --semi-harden (kept for compatibility)"
     echo "  -sh, --semi-harden        Apply the semi-hardened permission model (requires"
     echo "                            root): code tree owned by root and read-only for the"
@@ -160,15 +168,32 @@ get_cfg_value() {
     local config_file="$2"
     local value=""
 
+    # PHP path. CLI_SCRIPT must be defined too: lib/setup.php checks it BEFORE
+    # it honours ABORT_AFTER_CONFIG and dies otherwise, printing its complaint
+    # on stdout, which would otherwise be captured as if it were the value.
     if command -v php >/dev/null 2>&1; then
-        value=$(php -r "define('ABORT_AFTER_CONFIG', true); require('$config_file'); if (isset(\$CFG->$name)) { echo \$CFG->$name; }" 2>/dev/null)
+        value=$(php -r "define('CLI_SCRIPT', true); define('ABORT_AFTER_CONFIG', true); require('$config_file'); if (isset(\$CFG->$name)) { echo \$CFG->$name; }" 2>/dev/null) || value=""
+        # Pick the first line that looks like an absolute path: PHP notices,
+        # deprecations and die() messages are printed on stdout too.
+        value=$(printf '%s\n' "$value" | grep -m 1 '^/' || true)
+        # Anything that is not a single absolute path is an error message,
+        # a warning or a notice, never a usable value.
+        case "$value" in
+            /*) ;;
+            *) value="" ;;
+        esac
     fi
 
+    # Literal text parse fallback.
     if [ -z "$value" ]; then
         value=$(sed -n "s/^[[:space:]]*\$CFG->$name[[:space:]]*=[[:space:]]*['\"]\([^'\"]*\)['\"][[:space:]]*;.*/\1/p" "$config_file" | tail -n 1)
+        case "$value" in
+            /*) ;;
+            *) value="" ;;
+        esac
     fi
 
-    echo "$value"
+    printf '%s' "$value"
 }
 
 resolve_paths_from_config() {
@@ -192,11 +217,11 @@ resolve_paths_from_config() {
     fi
 
     # $CFG->dirroot is usually derived at runtime, so it is adopted only when
-    # config.php sets it explicitly.
+    # config.php sets it explicitly and points at a real directory.
     if [ "$MOODLE_DIR_FROM_ARG" = false ]; then
         local dirroot
         dirroot=$(get_cfg_value "dirroot" "$config_file")
-        if [ -n "$dirroot" ]; then
+        if [ -n "$dirroot" ] && [ -d "$dirroot" ]; then
             MOODLE_DIR="$dirroot"
             MOODLE_DIR_SOURCE="config.php"
         fi
@@ -206,8 +231,15 @@ resolve_paths_from_config() {
         local dataroot
         dataroot=$(get_cfg_value "dataroot" "$config_file")
         if [ -z "$dataroot" ]; then
-            echo "❌ ERROR: \$CFG->dataroot not found in $config_file"
+            echo "❌ ERROR: could not read a usable \$CFG->dataroot from $config_file"
+            echo "   Neither PHP nor the text parser returned an absolute path."
             echo "   Supply the moodledata path explicitly with -md."
+            exit $EXIT_DATAROOT_NOT_FOUND
+        fi
+        if [ ! -d "$dataroot" ]; then
+            echo "❌ ERROR: \$CFG->dataroot points at a non-existent directory:"
+            echo "   $dataroot"
+            echo "   Check config.php, or supply the path explicitly with -md."
             exit $EXIT_DATAROOT_NOT_FOUND
         fi
         MOODLEDATA_DIR="$dataroot"
@@ -365,7 +397,11 @@ apply_semi_harden() {
     # make_*_directory(), using the mode in $CFG->directorypermissions.
 
     echo ""
-    echo "✅ Semi-hardened permissions successfully applied."
+    if [ "$DRY_RUN" = true ]; then
+        echo "✅ DRY-RUN complete: nothing was changed."
+    else
+        echo "✅ Semi-hardened permissions successfully applied."
+    fi
     echo "ℹ️  Core code (lib/, install/, admin/cli, index.php, version.php,"
     echo "   config.php, vendor/) is now read-only for ${WWW_USER}."
     echo "   Plugin install, update and uninstall from the web UI still work."
@@ -437,7 +473,11 @@ apply_harden() {
     # Moodle did not choose.
 
     echo ""
-    echo "✅ Hardened permissions successfully applied."
+    if [ "$DRY_RUN" = true ]; then
+        echo "✅ DRY-RUN complete: nothing was changed."
+    else
+        echo "✅ Hardened permissions successfully applied."
+    fi
     echo "ℹ️  The code tree is now read-only for ${WWW_USER}: plugin install/update"
     echo "   from the web UI is disabled. Use the CLI as root instead."
     echo "ℹ️  No .htaccess is written. Make sure ${MOODLEDATA_DIR} is not reachable"
@@ -506,12 +546,6 @@ done
 # FINAL VALIDATION
 # --------------------------------------------------------
 
-# dry-run and semi-harden cannot be combined
-if [ "$DRY_RUN" = true ] && [ "$APPLY_FIXES" = true ]; then
-    echo "❌ ERROR: --dry-run and --semi-harden cannot be used together."
-    exit $EXIT_INVALID_ARGS
-fi
-
 # semi-harden and harden apply two different permission models
 if [ "$APPLY_FIXES" = true ] && [ "$APPLY_HARDEN" = true ]; then
     echo "❌ ERROR: --semi-harden and --harden cannot be used together."
@@ -526,7 +560,15 @@ resolve_paths_from_config
 # --------------------------------------------------------
 show_header
 
-if [ "$APPLY_FIXES" = true ]; then
+if [ "$DRY_RUN" = true ]; then
+    # run_cmd prints without executing; --semi-harden is simulated by default
+    if [ "$APPLY_HARDEN" = true ]; then
+        apply_harden
+    else
+        apply_semi_harden
+    fi
+
+elif [ "$APPLY_FIXES" = true ]; then
     if [ "$(id -u)" -ne 0 ]; then
         echo "❌ ERROR: --semi-harden requires root privileges."
         exit $EXIT_NOT_ROOT
@@ -536,7 +578,7 @@ if [ "$APPLY_FIXES" = true ]; then
         purge_moodle_cache
     fi
 
-elif [ "$APPLY_HARDEN" = true ] && [ "$DRY_RUN" = false ]; then
+elif [ "$APPLY_HARDEN" = true ]; then
     if [ "$(id -u)" -ne 0 ]; then
         echo "❌ ERROR: --harden requires root privileges."
         exit $EXIT_NOT_ROOT
@@ -544,13 +586,6 @@ elif [ "$APPLY_HARDEN" = true ] && [ "$DRY_RUN" = false ]; then
     apply_harden
     if [ "$CLEAR_CACHE" = true ]; then
         purge_moodle_cache
-    fi
-
-elif [ "$DRY_RUN" = true ]; then
-    if [ "$APPLY_HARDEN" = true ]; then
-        apply_harden   # run_cmd prints without executing
-    else
-        apply_semi_harden    # run_cmd prints without executing
     fi
 
 else
